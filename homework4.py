@@ -16,10 +16,14 @@ import seaborn as sns
 from collections import Counter
 import random
 import re
+import json
 warnings.filterwarnings('ignore')
 
 # 设置中文字体
-plt.rcParams['font.sans-serif'] = ['SimHei']
+import matplotlib
+matplotlib.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans', 'Arial Unicode MS']
+matplotlib.rcParams['axes.unicode_minus'] = False
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans', 'Arial Unicode MS']
 plt.rcParams['axes.unicode_minus'] = False
 
 class DLTSpider:
@@ -718,246 +722,6 @@ class DLTAnalyzer:
             hot_back = [str(num) for num, _ in back_freq.most_common(3)]
             print(f"  后区热门号码：{', '.join(hot_back)}")
 
-    def analyze_expert_data(self):
-        """分析真实专家数据"""
-        print("\n=== 专家数据分析 ===")
-
-        # 创建专家爬虫实例
-        expert_spider = ExpertSpider()
-
-        # 获取专家数据（30位专家）
-        experts_data = expert_spider.crawl_experts(target_count=30)
-
-        if not experts_data:
-            print("未能获取专家数据")
-            return None
-
-        # 转换为DataFrame
-        expert_df = pd.DataFrame(experts_data)
-
-        print(f"成功获取{len(expert_df)}位专家数据")
-
-        # 创建详细的可视化分析
-        plt.figure(figsize=(20, 15))
-
-        # 1. 专家彩龄分布
-        plt.subplot(3, 3, 1)
-        plt.hist(expert_df['彩龄'], bins=15, alpha=0.7, edgecolor='black', color='skyblue')
-        plt.title('专家彩龄分布')
-        plt.xlabel('彩龄（年）')
-        plt.ylabel('专家数量')
-        plt.grid(axis='y', alpha=0.3)
-
-        # 2. 文章数量分布
-        plt.subplot(3, 3, 2)
-        plt.hist(expert_df['文章数量'], bins=15, alpha=0.7, edgecolor='black', color='orange')
-        plt.title('专家发文量分布')
-        plt.xlabel('文章数量（篇）')
-        plt.ylabel('专家数量')
-        plt.grid(axis='y', alpha=0.3)
-
-        # 3. 专家等级分布
-        plt.subplot(3, 3, 3)
-        level_counts = expert_df['等级'].value_counts()
-        colors = ['#ff9999', '#66b3ff', '#99ff99', '#ffcc99']
-        plt.pie(level_counts.values, labels=level_counts.index, autopct='%1.1f%%', colors=colors)
-        plt.title('专家等级分布')
-
-        # 4. 大乐透一等奖分布
-        plt.subplot(3, 3, 4)
-        first_prize_counts = expert_df['大乐透一等奖'].value_counts().sort_index()
-        plt.bar(first_prize_counts.index, first_prize_counts.values, alpha=0.7, color='gold')
-        plt.title('大乐透一等奖中奖次数分布')
-        plt.xlabel('一等奖次数')
-        plt.ylabel('专家数量')
-        plt.grid(axis='y', alpha=0.3)
-
-        # 5. 彩龄与中奖率关系
-        plt.subplot(3, 3, 5)
-        plt.scatter(expert_df['彩龄'], expert_df['中奖率'], alpha=0.7, s=60)
-        plt.xlabel('彩龄（年）')
-        plt.ylabel('中奖率（%）')
-        plt.title('彩龄与中奖率关系')
-        plt.grid(True, alpha=0.3)
-
-        # 计算相关系数
-        correlation_age = expert_df['彩龄'].corr(expert_df['中奖率'])
-        plt.text(0.05, 0.95, f'相关系数: {correlation_age:.3f}', transform=plt.gca().transAxes,
-                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-
-        # 6. 发文量与中奖率关系
-        plt.subplot(3, 3, 6)
-        plt.scatter(expert_df['文章数量'], expert_df['中奖率'], alpha=0.7, color='red', s=60)
-        plt.xlabel('文章数量（篇）')
-        plt.ylabel('中奖率（%）')
-        plt.title('发文量与中奖率关系')
-        plt.grid(True, alpha=0.3)
-
-        # 计算相关系数
-        correlation_articles = expert_df['文章数量'].corr(expert_df['中奖率'])
-        plt.text(0.05, 0.95, f'相关系数: {correlation_articles:.3f}', transform=plt.gca().transAxes,
-                bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
-
-        # 7. 不同等级专家中奖率对比
-        plt.subplot(3, 3, 7)
-        level_win_rates = []
-        level_labels = []
-        for level in expert_df['等级'].unique():
-            level_data = expert_df[expert_df['等级'] == level]['中奖率']
-            if not level_data.empty:
-                level_win_rates.append(level_data.tolist())
-                level_labels.append(f"{level}({len(level_data)}人)")
-
-        if level_win_rates:
-            plt.boxplot(level_win_rates, labels=level_labels)
-            plt.ylabel('中奖率（%）')
-            plt.title('不同等级专家中奖率分布')
-            plt.xticks(rotation=45)
-            plt.grid(axis='y', alpha=0.3)
-
-        # 8. 总中奖次数分布
-        plt.subplot(3, 3, 8)
-        plt.hist(expert_df['总中奖次数'], bins=20, alpha=0.7, edgecolor='black', color='lightgreen')
-        plt.title('专家总中奖次数分布')
-        plt.xlabel('总中奖次数')
-        plt.ylabel('专家数量')
-        plt.grid(axis='y', alpha=0.3)
-
-        # 9. 中奖率分布
-        plt.subplot(3, 3, 9)
-        plt.hist(expert_df['中奖率'], bins=15, alpha=0.7, edgecolor='black', color='purple')
-        plt.title('专家中奖率分布')
-        plt.xlabel('中奖率（%）')
-        plt.ylabel('专家数量')
-        plt.grid(axis='y', alpha=0.3)
-
-        plt.tight_layout()
-        plt.show()
-
-        # 创建专家中奖情况详细分析
-        plt.figure(figsize=(15, 10))
-
-        # 各等级奖项分布热力图
-        plt.subplot(2, 2, 1)
-        prize_data = expert_df.groupby('等级')[['大乐透一等奖', '大乐透二等奖', '大乐透三等奖']].sum()
-        sns.heatmap(prize_data.T, annot=True, fmt='d', cmap='Reds', cbar_kws={'label': '中奖次数'})
-        plt.title('不同等级专家各奖项中奖次数')
-        plt.xlabel('专家等级')
-        plt.ylabel('奖项类型')
-
-        # 彩龄vs总中奖次数散点图
-        plt.subplot(2, 2, 2)
-        colors = expert_df['等级'].map({'初级': 'blue', '中级': 'green', '高级': 'red', '特级': 'purple'})
-        plt.scatter(expert_df['彩龄'], expert_df['总中奖次数'], c=colors, alpha=0.7, s=80)
-        plt.xlabel('彩龄（年）')
-        plt.ylabel('总中奖次数')
-        plt.title('彩龄与总中奖次数关系（按等级分色）')
-        plt.grid(True, alpha=0.3)
-
-        # 创建图例
-        for level, color in [('初级', 'blue'), ('中级', 'green'), ('高级', 'red'), ('特级', 'purple')]:
-            plt.scatter([], [], c=color, alpha=0.7, s=80, label=level)
-        plt.legend()
-
-        # 文章数量vs中奖率散点图（按彩龄分色）
-        plt.subplot(2, 2, 3)
-        scatter = plt.scatter(expert_df['文章数量'], expert_df['中奖率'],
-                            c=expert_df['彩龄'], cmap='viridis', alpha=0.7, s=80)
-        plt.xlabel('文章数量（篇）')
-        plt.ylabel('中奖率（%）')
-        plt.title('文章数量与中奖率关系（彩龄着色）')
-        plt.colorbar(scatter, label='彩龄（年）')
-        plt.grid(True, alpha=0.3)
-
-        # 专家综合实力评分
-        plt.subplot(2, 2, 4)
-        # 计算综合评分：彩龄权重30% + 中奖率权重40% + 文章数量权重20% + 等级权重10%
-        level_score = expert_df['等级'].map({'初级': 1, '中级': 2, '高级': 3, '特级': 4})
-
-        expert_df['综合评分'] = (
-            (expert_df['彩龄'] / expert_df['彩龄'].max()) * 30 +
-            (expert_df['中奖率'] / expert_df['中奖率'].max()) * 40 +
-            (expert_df['文章数量'] / expert_df['文章数量'].max()) * 20 +
-            (level_score / level_score.max()) * 10
-        )
-
-        plt.hist(expert_df['综合评分'], bins=15, alpha=0.7, edgecolor='black', color='cyan')
-        plt.title('专家综合实力评分分布')
-        plt.xlabel('综合评分')
-        plt.ylabel('专家数量')
-        plt.grid(axis='y', alpha=0.3)
-
-        plt.tight_layout()
-        plt.show()
-
-        # 打印详细统计报告
-        print("\n" + "="*60)
-        print("                专家数据统计分析报告")
-        print("="*60)
-
-        print(f"专家总数：{len(expert_df)}人")
-        print(f"数据获取时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-        print(f"\n=== 基本属性统计 ===")
-        print(f"平均彩龄：{expert_df['彩龄'].mean():.1f}年（标准差：{expert_df['彩龄'].std():.1f}年）")
-        print(f"彩龄范围：{expert_df['彩龄'].min()}年 - {expert_df['彩龄'].max()}年")
-        print(f"平均发文量：{expert_df['文章数量'].mean():.0f}篇（标准差：{expert_df['文章数量'].std():.0f}篇）")
-        print(f"发文量范围：{expert_df['文章数量'].min()}篇 - {expert_df['文章数量'].max()}篇")
-
-        print(f"\n=== 中奖情况统计 ===")
-        print(f"大乐透一等奖总计：{expert_df['大乐透一等奖'].sum()}次")
-        print(f"大乐透二等奖总计：{expert_df['大乐透二等奖'].sum()}次")
-        print(f"大乐透三等奖总计：{expert_df['大乐透三等奖'].sum()}次")
-        print(f"平均中奖率：{expert_df['中奖率'].mean():.2f}%（标准差：{expert_df['中奖率'].std():.2f}%）")
-        print(f"最高中奖率：{expert_df['中奖率'].max():.2f}%")
-        print(f"最低中奖率：{expert_df['中奖率'].min():.2f}%")
-
-        print(f"\n=== 不同等级专家统计 ===")
-        for level in expert_df['等级'].unique():
-            level_data = expert_df[expert_df['等级'] == level]
-            if not level_data.empty:
-                print(f"{level}专家（{len(level_data)}人）：")
-                print(f"  平均彩龄：{level_data['彩龄'].mean():.1f}年")
-                print(f"  平均发文量：{level_data['文章数量'].mean():.0f}篇")
-                print(f"  平均中奖率：{level_data['中奖率'].mean():.2f}%")
-                print(f"  一等奖总数：{level_data['大乐透一等奖'].sum()}次")
-
-        print(f"\n=== 相关性分析 ===")
-        print(f"彩龄与中奖率相关系数：{correlation_age:.3f}")
-        print(f"发文量与中奖率相关系数：{correlation_articles:.3f}")
-
-        # 计算更多相关性
-        corr_age_total = expert_df['彩龄'].corr(expert_df['总中奖次数'])
-        corr_articles_total = expert_df['文章数量'].corr(expert_df['总中奖次数'])
-        print(f"彩龄与总中奖次数相关系数：{corr_age_total:.3f}")
-        print(f"发文量与总中奖次数相关系数：{corr_articles_total:.3f}")
-
-        print(f"\n=== Top 10 专家排行榜 ===")
-        # 按综合评分排序
-        top_experts = expert_df.nlargest(10, '综合评分')
-        for i, (_, expert) in enumerate(top_experts.iterrows(), 1):
-            print(f"{i:2d}. {expert['name']}：")
-            print(f"    综合评分：{expert['综合评分']:.1f} | 彩龄：{expert['彩龄']}年 | 中奖率：{expert['中奖率']:.2f}%")
-            print(f"    发文：{expert['文章数量']}篇 | 等级：{expert['等级']} | 一等奖：{expert['大乐透一等奖']}次")
-
-        print(f"\n=== 中奖效率最高专家 ===")
-        # 按中奖率排序
-        top_winners = expert_df.nlargest(5, '中奖率')
-        for i, (_, expert) in enumerate(top_winners.iterrows(), 1):
-            print(f"{i}. {expert['name']}：中奖率{expert['中奖率']:.2f}%，彩龄{expert['彩龄']}年，一等奖{expert['大乐透一等奖']}次")
-
-        # 保存专家数据分析结果
-        try:
-            expert_df.to_csv('expert_analysis_result.csv', index=False, encoding='utf-8-sig')
-            print(f"\n专家分析结果已保存到：expert_analysis_result.csv")
-        except Exception as e:
-            print(f"保存分析结果失败：{e}")
-
-        print("\n" + "="*60)
-        print("                专家数据分析完成")
-        print("="*60)
-
-        return expert_df
 
     def save_data(self, filename='dlt_data.csv'):
         """保存数据到CSV文件"""
@@ -1038,8 +802,17 @@ def main():
                     print("\n执行不同开奖日对比分析...")
                     analyzer.analyze_weekday_patterns()
                 elif choice == '5':
-                    print("\n执行专家数据统计分析...")
-                    analyzer.analyze_expert_data()
+                    print("=== 专家数据分析功能 ===")
+
+                    # 创建专家分析器实例
+                    analyzer1 = ExpertAnalyzer()
+                    # 运行完整的专家数据分析流程
+                    result_df = analyzer1.run_expert_analysis()
+                    if result_df is not None:
+                        print(f"成功分析了 {len(result_df)} 位专家的数据")
+                    else:
+                        print("\n❌ 专家数据分析功能测试失败！")
+
                 elif choice == '6':
                     print("\n生成综合分析报告...")
                     # 执行所有分析
@@ -1071,431 +844,382 @@ def main():
         print(f"程序启动失败：{e}")
 
 
-class ExpertSpider:
+
+class ExpertAnalyzer:
     def __init__(self):
-        self.base_url = "https://www.cmzj.net/dlt/tickets"
-        self.expert_base_url = "https://www.cmzj.net/expertItem"
+        self.expert_list_url = "https://i.cmzj.net/expert/rankingList?limit=30&page=1&lottery=23&quota=1&type=2&target=%E6%80%BB%E5%88%86&classPay=2&issueNum=7"
+        self.expert_detail_url = "https://www.cmzj.net/expertItem?id={}"
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
+            'Referer': 'https://www.cmzj.net/',
         }
+        self.session = requests.Session()
+        self.session.headers.update(self.headers)
 
-    def get_expert_list(self, target_count=30):
-        """获取专家列表，通过换一批按钮获取更多专家"""
+    def get_expert_list(self):
+        """获取专家列表数据"""
         try:
+            print("正在获取专家列表...")
+            response = self.session.get(self.expert_list_url, timeout=10)
+            response.raise_for_status()
+
+            data = response.json()
+            if data.get('code') == 0 and 'data' in data:
+                experts = data['data']
+                print(f"成功获取到 {len(experts)} 位专家的基本信息")
+                return experts
+            else:
+                print("API返回数据格式错误")
+                return None
+
+        except requests.RequestException as e:
+            print(f"网络请求失败: {e}")
+            # 如果网络请求失败，尝试从本地JSON文件读取
+            try:
+                print("尝试从本地JSON文件读取数据...")
+                with open('zj.json', 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if data.get('code') == 0 and 'data' in data:
+                        experts = data['data']
+                        print(f"从本地文件成功读取到 {len(experts)} 位专家的基本信息")
+                        return experts
+            except FileNotFoundError:
+                print("本地JSON文件不存在")
+            except json.JSONDecodeError:
+                print("本地JSON文件格式错误")
+            return None
+
+    def get_expert_detail(self, expert_id, expert_name):
+        """获取专家详细信息"""
+        try:
+            url = self.expert_detail_url.format(expert_id)
+            print(f"正在获取专家 {expert_name} (ID: {expert_id}) 的详细信息...")
+
             # 配置浏览器选项
             options = webdriver.ChromeOptions()
+            options.add_argument('--headless')  # 无头模式
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--disable-gpu')
-            options.add_argument('--disable-blink-features=AutomationControlled')
-            options.add_experimental_option("excludeSwitches", ["enable-automation"])
-            options.add_experimental_option('useAutomationExtension', False)
 
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=options)
-            driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
-            print(f"正在访问专家页面: {self.base_url}")
-            driver.get(self.base_url)
-            time.sleep(5)
+            driver.get(url)
+            time.sleep(2)
 
-            all_experts = []
-            rounds = 0
-            max_rounds = 6
-
-            while len(all_experts) < target_count and rounds < max_rounds:
-                print(f"第{rounds + 1}轮获取专家信息...")
-
-                # 等待专家列表加载
-                try:
-                    WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.CLASS_NAME, "items"))
-                    )
-                    time.sleep(2)
-                except:
-                    print("专家列表加载超时")
-                    break
-
-                # 获取当前页面的前8个专家名称
-                expert_names = []
-                try:
-                    experts = driver.find_elements(By.CLASS_NAME, "items")
-                    expert_items = experts[:8]  # 只取前8个作为专家
-
-                    print(f"找到 {len(expert_items)} 个专家item")
-
-                    for expert in expert_items:
-                        try:
-                            name_element = expert.find_element(By.CLASS_NAME, "okami-name")
-                            expert_name = name_element.text.strip()
-
-                            # 检查是否已经获取过该专家
-                            if expert_name and expert_name not in [e['name'] for e in all_experts]:
-                                expert_names.append(expert_name)
-
-                        except Exception as e:
-                            print(f"提取专家名称时出错: {e}")
-                            continue
-
-                    print(f"本轮准备获取 {len(expert_names)} 位新专家数据")
-
-                except Exception as e:
-                    print(f"获取专家列表时出错: {e}")
-                    break
-
-                # 逐个点击专家获取详细信息
-                for i, expert_name in enumerate(expert_names):
-                    try:
-                        if len(all_experts) >= target_count:
-                            break
-
-                        print(f"正在获取第{i + 1}位专家：{expert_name}")
-
-                        # 确保在主页面，重新查找专家元素
-                        current_url = driver.current_url
-                        if self.base_url not in current_url:
-                            print("不在主页面，返回主页面")
-                            driver.get(self.base_url)
-                            time.sleep(3)
-                            WebDriverWait(driver, 10).until(
-                                EC.presence_of_element_located((By.CLASS_NAME, "items"))
-                            )
-                            time.sleep(2)
-
-                        # 重新获取专家元素列表（只查找前8个）
-                        experts = driver.find_elements(By.CLASS_NAME, "items")
-                        expert_items = experts[:8]
-                        target_expert = None
-
-                        # 在前8个专家中查找目标专家
-                        for expert in expert_items:
-                            try:
-                                name_element = expert.find_element(By.CLASS_NAME, "okami-name")
-                                if name_element.text.strip() == expert_name:
-                                    target_expert = name_element
-                                    break
-                            except:
-                                continue
-
-                        if target_expert:
-                            # 点击专家名称进入详情页
-                            print(f"点击专家：{expert_name}")
-                            driver.execute_script("arguments[0].click();", target_expert)
-                            time.sleep(3)
-
-                            # 等待详情页加载
-                            try:
-                                WebDriverWait(driver, 10).until(
-                                    EC.presence_of_element_located((By.CLASS_NAME, "okami-text"))
-                                )
-                                time.sleep(2)
-                            except:
-                                print(f"专家详情页加载超时：{expert_name}")
-                                # 返回主页面继续
-                                driver.get(self.base_url)
-                                time.sleep(3)
-                                continue
-
-                            # 获取专家详细信息
-                            expert_data = self.parse_expert_detail(driver)
-                            if expert_data:
-                                expert_data['name'] = expert_name
-                                all_experts.append(expert_data)
-                                print(f"成功获取专家 {expert_name} 的数据，目前总数：{len(all_experts)}")
-                            else:
-                                print(f"获取专家 {expert_name} 数据失败")
-
-                            # 返回主页面
-                            print("返回主页面...")
-                            driver.get(self.base_url)
-                            time.sleep(3)
-
-                            # 等待主页面加载完成
-                            try:
-                                WebDriverWait(driver, 10).until(
-                                    EC.presence_of_element_located((By.CLASS_NAME, "items"))
-                                )
-                                time.sleep(2)
-                            except:
-                                print("返回主页面加载超时")
-                                break
-
-                        else:
-                            print(f"未找到专家：{expert_name}")
-
-                    except Exception as e:
-                        print(f"处理专家 {expert_name} 时出错: {e}")
-                        # 确保返回主页面
-                        try:
-                            driver.get(self.base_url)
-                            time.sleep(3)
-                            WebDriverWait(driver, 10).until(
-                                EC.presence_of_element_located((By.CLASS_NAME, "items"))
-                            )
-                            time.sleep(2)
-                        except:
-                            print("返回主页面失败")
-                            break
-                        continue
-
-                rounds += 1
-
-                # 如果还需要更多专家，点击"换一批"按钮
-                if len(all_experts) < target_count and rounds < max_rounds:
-                    try:
-                        print("准备点击'换一批'按钮...")
-
-                        # 确保在主页面
-                        current_url = driver.current_url
-                        if self.base_url not in current_url:
-                            driver.get(self.base_url)
-                            time.sleep(3)
-                            WebDriverWait(driver, 10).until(
-                                EC.presence_of_element_located((By.CLASS_NAME, "items"))
-                            )
-                            time.sleep(2)
-
-                        # 查找并点击"换一批"按钮
-                        change_button = WebDriverWait(driver, 10).until(
-                            EC.element_to_be_clickable((By.CSS_SELECTOR, "div.change"))
-                        )
-
-                        # 滚动到按钮位置
-                        driver.execute_script("arguments[0].scrollIntoView(true);", change_button)
-                        time.sleep(1)
-
-                        # 点击换一批按钮
-                        driver.execute_script("arguments[0].click();", change_button)
-                        print("成功点击'换一批'按钮")
-                        time.sleep(4)  # 等待新的专家列表加载
-
-                        # 验证新列表是否加载
-                        try:
-                            WebDriverWait(driver, 10).until(
-                                EC.presence_of_element_located((By.CLASS_NAME, "items"))
-                            )
-                            time.sleep(2)
-                            print("新专家列表加载完成")
-                        except:
-                            print("新专家列表加载超时")
-                            break
-
-                    except Exception as e:
-                        print(f"点击'换一批'按钮失败: {e}")
-                        # 尝试其他方式查找按钮
-                        try:
-                            # 尝试通过包含文本"换一批"的元素查找
-                            change_buttons = driver.find_elements(By.XPATH, "//div[contains(@class, 'change')]")
-                            if change_buttons:
-                                driver.execute_script("arguments[0].click();", change_buttons[0])
-                                print("通过备用方法点击'换一批'按钮")
-                                time.sleep(4)
-                            else:
-                                print("未找到'换一批'按钮，结束获取")
-                                break
-                        except Exception as e2:
-                            print(f"备用方法也失败: {e2}")
-                            break
-
-            driver.quit()
-            print(f"专家数据获取完成，共获取{len(all_experts)}位专家信息")
-            return all_experts
-
-        except Exception as e:
-            print(f"获取专家列表时出错: {e}")
-            try:
-                driver.quit()
-            except:
-                pass
-            return []
-
-    def parse_expert_detail(self, driver):
-        """解析专家详情页面"""
-        try:
             # 等待页面加载
             WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.CLASS_NAME, "okami-text"))
             )
-            time.sleep(2)
 
-            expert_data = {}
+            # 获取页面HTML
+            html = driver.page_source
+            driver.quit()
 
-            # 获取彩龄
-            try:
-                cailing_elements = driver.find_elements(By.XPATH, "//p[contains(text(), '彩龄：')]/span")
-                if cailing_elements:
-                    cailing_text = cailing_elements[0].text.strip()
-                    cailing_match = re.search(r'(\d+)', cailing_text)
-                    expert_data['彩龄'] = int(cailing_match.group(1)) if cailing_match else 1
-                else:
-                    # 备用方法
-                    cailing_p = driver.find_elements(By.XPATH, "//p[contains(text(), '彩龄：')]")
-                    if cailing_p:
-                        cailing_text = cailing_p[0].text
-                        cailing_match = re.search(r'彩龄：(\d+)', cailing_text)
-                        expert_data['彩龄'] = int(cailing_match.group(1)) if cailing_match else 1
-                    else:
-                        expert_data['彩龄'] = 1
-            except Exception as e:
-                print(f"获取彩龄时出错: {e}")
-                expert_data['彩龄'] = 1
-
-            # 获取文章数量
-            try:
-                article_elements = driver.find_elements(By.XPATH, "//p[contains(text(), '文章数量：')]/span")
-                if article_elements:
-                    article_text = article_elements[0].text.strip()
-                    article_match = re.search(r'(\d+)', article_text)
-                    expert_data['文章数量'] = int(article_match.group(1)) if article_match else 0
-                else:
-                    # 备用方法
-                    article_p = driver.find_elements(By.XPATH, "//p[contains(text(), '文章数量：')]")
-                    if article_p:
-                        article_text = article_p[0].text
-                        article_match = re.search(r'文章数量：(\d+)', article_text)
-                        expert_data['文章数量'] = int(article_match.group(1)) if article_match else 0
-                    else:
-                        expert_data['文章数量'] = 0
-            except Exception as e:
-                print(f"获取文章数量时出错: {e}")
-                expert_data['文章数量'] = 0
-
-            # 初始化中奖情况
-            expert_data['大乐透一等奖'] = 0
-            expert_data['大乐透二等奖'] = 0
-            expert_data['大乐透三等奖'] = 0
-
-            # 获取大乐透中奖情况
-            try:
-                # 查找所有包含奖项信息的元素
-                prize_elements = driver.find_elements(By.XPATH, "//div[@class='item']")
-
-                for item in prize_elements:
-                    try:
-                        item_text = item.text
-                        # 匹配大乐透各等奖
-                        if '大乐透' in item_text and '一等奖' in item_text:
-                            match = re.search(r'(\d+)', item_text)
-                            if match:
-                                expert_data['大乐透一等奖'] = int(match.group(1))
-                        elif '大乐透' in item_text and '二等奖' in item_text:
-                            match = re.search(r'(\d+)', item_text)
-                            if match:
-                                expert_data['大乐透二等奖'] = int(match.group(1))
-                        elif '大乐透' in item_text and '三等奖' in item_text:
-                            match = re.search(r'(\d+)', item_text)
-                            if match:
-                                expert_data['大乐透三等奖'] = int(match.group(1))
-                    except Exception as e:
-                        continue
-
-            except Exception as e:
-                print(f"解析中奖情况时出错: {e}")
-
-            # 获取专家等级
-            try:
-                level_elements = driver.find_elements(By.CLASS_NAME, "expert-rank")
-                if level_elements:
-                    level_text = level_elements[0].text
-                    if '特级' in level_text:
-                        expert_data['等级'] = '特级'
-                    elif '高级' in level_text:
-                        expert_data['等级'] = '高级'
-                    elif '中级' in level_text:
-                        expert_data['等级'] = '中级'
-                    else:
-                        expert_data['等级'] = '初级'
-                else:
-                    expert_data['等级'] = '初级'
-            except Exception as e:
-                print(f"获取专家等级时出错: {e}")
-                expert_data['等级'] = '初级'
-
-            # 计算总中奖次数和中奖率
-            total_wins = expert_data['大乐透一等奖'] + expert_data['大乐透二等奖'] + expert_data['大乐透三等奖']
-            expert_data['总中奖次数'] = total_wins
-
-            # 估算推荐次数（基于彩龄和文章数量）
-            estimated_predictions = max(expert_data['彩龄'] * 50, expert_data['文章数量'] * 2, 100)
-            expert_data['推荐次数'] = estimated_predictions
-
-            # 计算中奖率
-            if estimated_predictions > 0:
-                expert_data['中奖率'] = (total_wins / estimated_predictions) * 100
-            else:
-                expert_data['中奖率'] = 0
-
-            print(f"专家数据: 彩龄{expert_data['彩龄']}年, 文章{expert_data['文章数量']}篇, 大乐透中奖{total_wins}次")
-            return expert_data
+            return self.parse_expert_detail(html, expert_name)
 
         except Exception as e:
-            print(f"解析专家详情时出错: {e}")
+            print(f"获取专家 {expert_name} 详细信息失败: {e}")
             return None
 
-    def crawl_experts(self, target_count=30):
-        """爬取专家数据的主方法"""
-        print(f"开始获取{target_count}位专家数据...")
+    def parse_expert_detail(self, html, expert_name):
+        """解析专家详细信息"""
+        try:
+            soup = BeautifulSoup(html, 'html.parser')
 
-        experts_data = self.get_expert_list(target_count)
-
-        if experts_data:
-            print(f"成功获取{len(experts_data)}位专家数据")
-
-            # 保存专家数据到文件
-            try:
-                expert_df = pd.DataFrame(experts_data)
-                expert_df.to_csv('experts_data.csv', index=False, encoding='utf-8-sig')
-                print("专家数据已保存到：experts_data.csv")
-            except Exception as e:
-                print(f"保存专家数据失败：{e}")
-        else:
-            print("未获取到任何专家数据")
-
-        return experts_data
-
-    def generate_mock_data(self, count=30):
-        """生成模拟专家数据（备用方案）"""
-        expert_names = [
-            "倩女幽球", "诸葛战神", "刘飞", "福道缘", "纳财纳福",
-            "金铃铛", "引领者", "时代彩民", "彩票达人", "幸运星",
-            "数字专家", "预测大师", "中奖王", "彩神", "运势分析师",
-            "号码猎手", "彩票研究员", "大奖收割机", "选号专家", "概率大师",
-            "走势分析师", "彩票教授", "中奖专家", "数据分析师", "彩票顾问",
-            "预测专家", "彩票导师", "中奖助手", "号码专家", "彩票学者"
-        ]
-
-        np.random.seed(42)
-        mock_experts = []
-
-        for i, name in enumerate(expert_names[:count]):
-            expert = {
-                'name': name,
-                '彩龄': np.random.randint(3, 20),
-                '文章数量': np.random.randint(100, 2000),
-                '大乐透一等奖': np.random.choice([0, 1, 2, 3, 4, 5], p=[0.3, 0.3, 0.2, 0.1, 0.07, 0.03]),
-                '大乐透二等奖': np.random.randint(0, 8),
-                '大乐透三等奖': np.random.randint(2, 20),
-                '等级': np.random.choice(['初级', '中级', '高级', '特级'], p=[0.2, 0.3, 0.4, 0.1])
+            # 初始化返回数据
+            detail_data = {
+                'name': expert_name,
+                'experience_years': 0,
+                'article_count': 0,
+                'total_awards': 0
             }
 
-            # 计算总中奖次数
-            total_wins = expert['大乐透一等奖'] + expert['大乐透二等奖'] + expert['大乐透三等奖']
-            expert['总中奖次数'] = total_wins
+            # 查找包含专家信息的div
+            okami_text = soup.find('div', class_='okami-text')
+            if not okami_text:
+                print(f"未找到专家 {expert_name} 的详细信息区域")
+                return detail_data
 
-            # 估算推荐次数
-            estimated_predictions = max(expert['彩龄'] * 50, expert['文章数量'] * 2, 200)
-            expert['推荐次数'] = estimated_predictions
+            # 提取彩龄
+            for p in okami_text.find_all('p'):
+                text = p.get_text()
+                if '彩龄：' in text:
+                    years_match = re.search(r'彩龄：\s*(\d+)年', text)
+                    if years_match:
+                        detail_data['experience_years'] = int(years_match.group(1))
+                        print(f"  彩龄: {detail_data['experience_years']}年")
 
-            # 计算中奖率
-            expert['中奖率'] = (total_wins / estimated_predictions) * 100
+                # 提取文章数量
+                elif '文章数量：' in text:
+                    articles_match = re.search(r'文章数量：\s*(\d+)篇', text)
+                    if articles_match:
+                        detail_data['article_count'] = int(articles_match.group(1))
+                        print(f"  文章数量: {detail_data['article_count']}篇")
 
-            mock_experts.append(expert)
+            # 提取双色球大奖战绩
+            djzj_divs = soup.find_all('div', class_='djzj')
+            for djzj in djzj_divs:
+                span = djzj.find('span', class_='text-head-bg')
+                if span and '双色球' in span.get_text():
+                    # 统计所有奖项
+                    items = djzj.find_all('div', class_='item')
+                    total_awards = 0
+                    for item in items:
+                        award_match = re.search(r'(\d+)次', item.get_text())
+                        if award_match:
+                            total_awards += int(award_match.group(1))
 
-        return mock_experts
+                    detail_data['total_awards'] = total_awards
+                    print(f"  双色球总获奖次数: {total_awards}次")
+                    break
+
+            return detail_data
+
+        except Exception as e:
+            print(f"解析专家 {expert_name} 详细信息时出错: {e}")
+            return {
+                'name': expert_name,
+                'experience_years': 0,
+                'article_count': 0,
+                'total_awards': 0
+            }
+
+    def crawl_experts_data(self):
+        """爬取所有专家数据"""
+        # 获取专家列表
+        experts_list = self.get_expert_list()
+        if not experts_list:
+            print("无法获取专家列表，程序退出")
+            return None
+
+        all_expert_data = []
+
+        # 限制获取前30位专家
+        experts_to_process = experts_list[:30]
+
+        for i, expert in enumerate(experts_to_process):
+            expert_id = expert.get('expertId')
+            expert_name = expert.get('name', f'专家{i+1}')
+
+            print(f"\n处理第 {i+1}/30 位专家: {expert_name}")
+
+            # 获取基本信息
+            basic_data = {
+                'expert_id': expert_id,
+                'name': expert_name,
+                'lottery': expert.get('lottery', 0),
+                'follow': expert.get('follow', 0),
+                'grade_name': expert.get('gradeName', ''),
+                'rank': expert.get('rank', 0),
+                'norm': expert.get('norm', 0),
+                'best_record': expert.get('bestRecord', ''),
+                'good_record': expert.get('goodRecord', '')
+            }
+
+            # 获取详细信息
+            detail_data = self.get_expert_detail(expert_id, expert_name)
+            if detail_data:
+                # 合并基本信息和详细信息
+                basic_data.update(detail_data)
+
+            all_expert_data.append(basic_data)
+
+            # 添加延时避免请求过快
+            time.sleep(1)
+
+        return all_expert_data
+
+    def save_to_csv(self, expert_data, filename='expert_analysis_result.csv'):
+        """保存数据到CSV文件"""
+        try:
+            df = pd.DataFrame(expert_data)
+            df.to_csv(filename, index=False, encoding='utf-8-sig')
+            print(f"\n数据已保存到 {filename}")
+            print(f"共保存了 {len(df)} 位专家的数据")
+            return df
+        except Exception as e:
+            print(f"保存CSV文件时出错: {e}")
+            return None
+
+    def analyze_and_visualize(self, df):
+        """分析数据并进行可视化"""
+        if df is None or df.empty:
+            print("没有数据可供分析")
+            return
+
+        print("\n开始数据分析和可视化...")
+
+        # 设置图形样式
+        fig = plt.figure(figsize=(20, 15))
+
+        # 1. 彩龄分布
+        plt.subplot(3, 4, 1)
+        plt.hist(df['experience_years'], bins=10, alpha=0.7, color='skyblue', edgecolor='black')
+        plt.title('专家彩龄分布', fontsize=14, fontweight='bold')
+        plt.xlabel('彩龄（年）')
+        plt.ylabel('人数')
+        plt.grid(True, alpha=0.3)
+
+        # 2. 文章数量分布
+        plt.subplot(3, 4, 2)
+        plt.hist(df['article_count'], bins=15, alpha=0.7, color='lightgreen', edgecolor='black')
+        plt.title('专家文章数量分布', fontsize=14, fontweight='bold')
+        plt.xlabel('文章数量')
+        plt.ylabel('人数')
+        plt.grid(True, alpha=0.3)
+
+        # 3. 获奖次数分布
+        plt.subplot(3, 4, 3)
+        plt.hist(df['total_awards'], bins=10, alpha=0.7, color='lightcoral', edgecolor='black')
+        plt.title('专家获奖次数分布', fontsize=14, fontweight='bold')
+        plt.xlabel('获奖次数')
+        plt.ylabel('人数')
+        plt.grid(True, alpha=0.3)
+
+        # 4. 专家等级分布
+        plt.subplot(3, 4, 4)
+        grade_counts = df['grade_name'].value_counts()
+        plt.pie(grade_counts.values, labels=grade_counts.index, autopct='%1.1f%%', startangle=90)
+        plt.title('专家等级分布', fontsize=14, fontweight='bold')
+
+        # 5. 彩龄与文章数量的关系
+        plt.subplot(3, 4, 5)
+        plt.scatter(df['experience_years'], df['article_count'], alpha=0.6, color='purple')
+        plt.title('彩龄与文章数量关系', fontsize=14, fontweight='bold')
+        plt.xlabel('彩龄（年）')
+        plt.ylabel('文章数量')
+        plt.grid(True, alpha=0.3)
+
+        # 计算相关系数
+        corr_exp_article = df['experience_years'].corr(df['article_count'])
+        plt.text(0.05, 0.95, f'相关系数: {corr_exp_article:.3f}',
+                transform=plt.gca().transAxes, fontsize=10,
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        # 6. 彩龄与获奖次数的关系
+        plt.subplot(3, 4, 6)
+        plt.scatter(df['experience_years'], df['total_awards'], alpha=0.6, color='orange')
+        plt.title('彩龄与获奖次数关系', fontsize=14, fontweight='bold')
+        plt.xlabel('彩龄（年）')
+        plt.ylabel('获奖次数')
+        plt.grid(True, alpha=0.3)
+
+        # 计算相关系数
+        corr_exp_awards = df['experience_years'].corr(df['total_awards'])
+        plt.text(0.05, 0.95, f'相关系数: {corr_exp_awards:.3f}',
+                transform=plt.gca().transAxes, fontsize=10,
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        # 7. 文章数量与获奖次数的关系
+        plt.subplot(3, 4, 7)
+        plt.scatter(df['article_count'], df['total_awards'], alpha=0.6, color='brown')
+        plt.title('文章数量与获奖次数关系', fontsize=14, fontweight='bold')
+        plt.xlabel('文章数量')
+        plt.ylabel('获奖次数')
+        plt.grid(True, alpha=0.3)
+
+        # 计算相关系数
+        corr_article_awards = df['article_count'].corr(df['total_awards'])
+        plt.text(0.05, 0.95, f'相关系数: {corr_article_awards:.3f}',
+                transform=plt.gca().transAxes, fontsize=10,
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        # 8. 不同等级专家的获奖情况
+        plt.subplot(3, 4, 8)
+        grade_awards = df.groupby('grade_name')['total_awards'].mean().sort_values(ascending=False)
+        grade_awards.plot(kind='bar', color='teal', alpha=0.7)
+        plt.title('不同等级专家平均获奖次数', fontsize=14, fontweight='bold')
+        plt.xlabel('专家等级')
+        plt.ylabel('平均获奖次数')
+        plt.xticks(rotation=45)
+        plt.grid(True, alpha=0.3)
+
+        # 9. 关注度分布
+        plt.subplot(3, 4, 9)
+        plt.hist(df['follow'], bins=10, alpha=0.7, color='gold', edgecolor='black')
+        plt.title('专家关注度分布', fontsize=14, fontweight='bold')
+        plt.xlabel('关注人数')
+        plt.ylabel('专家人数')
+        plt.grid(True, alpha=0.3)
+
+        # 10. 积分分布
+        plt.subplot(3, 4, 10)
+        plt.hist(df['norm'], bins=15, alpha=0.7, color='pink', edgecolor='black')
+        plt.title('专家积分分布', fontsize=14, fontweight='bold')
+        plt.xlabel('积分')
+        plt.ylabel('专家人数')
+        plt.grid(True, alpha=0.3)
+
+        # 11. 中奖率分析（获奖次数/文章数量）
+        plt.subplot(3, 4, 11)
+        # 避免除零错误
+        df['win_rate'] = df.apply(lambda x: x['total_awards'] / x['article_count'] if x['article_count'] > 0 else 0, axis=1)
+        plt.hist(df['win_rate'], bins=10, alpha=0.7, color='cyan', edgecolor='black')
+        plt.title('专家中奖率分布', fontsize=14, fontweight='bold')
+        plt.xlabel('中奖率（获奖次数/文章数量）')
+        plt.ylabel('专家人数')
+        plt.grid(True, alpha=0.3)
+
+        # 12. 综合分析热力图
+        plt.subplot(3, 4, 12)
+        correlation_data = df[['experience_years', 'article_count', 'total_awards', 'follow', 'norm', 'win_rate']].corr()
+        sns.heatmap(correlation_data, annot=True, cmap='coolwarm', center=0,
+                   square=True, linewidths=0.5, cbar_kws={"shrink": .8})
+        plt.title('各指标相关性热力图', fontsize=14, fontweight='bold')
+
+        plt.tight_layout()
+        plt.savefig('expert_analysis.png', dpi=300, bbox_inches='tight')
+        plt.show()
+
+        # 输出统计摘要
+        print("\n=== 专家数据统计摘要 ===")
+        print(f"总专家数: {len(df)}")
+        print(f"平均彩龄: {df['experience_years'].mean():.1f}年")
+        print(f"平均文章数: {df['article_count'].mean():.0f}篇")
+        print(f"平均获奖次数: {df['total_awards'].mean():.1f}次")
+        print(f"平均中奖率: {df['win_rate'].mean():.3f}")
+        print(f"彩龄与获奖次数相关系数: {corr_exp_awards:.3f}")
+        print(f"文章数量与获奖次数相关系数: {corr_article_awards:.3f}")
+
+        return df
+
+    def run_expert_analysis(self):
+        """运行专家数据分析的完整流程"""
+        print("=== 开始专家数据分析 ===")
+
+        # 首先检查是否存在已保存的专家数据文件
+        expert_csv_file = 'expert_analysis_result.csv'
+        expert_data = None
+        df = None
+        # 尝试从CSV文件读取专家数据
+        print("正在检查本地专家数据文件...")
+        df = pd.read_csv(expert_csv_file, encoding='utf-8-sig')
+
+        if not df.empty and len(df) > 0:
+            print(f"✅ 从本地文件 `{expert_csv_file}` 成功读取到 {len(df)} 位专家的数据")
+            self.analyze_and_visualize(df)
+        else:
+            # 1. 爬取专家数据
+            expert_data = self.crawl_experts_data()
+            if not expert_data:
+                print("数据爬取失败，程序结束")
+                return
+            # 2. 保存到CSV
+            df = self.save_to_csv(expert_data)
+            if df is None:
+                print("数据保存失败，程序结束")
+                return
+            # 3. 数据分析和可视化
+            self.analyze_and_visualize(df)
+
+        print("\n=== 专家数据分析完成 ===")
+        return df
 
 if __name__ == "__main__":
     main()
