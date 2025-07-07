@@ -41,14 +41,88 @@ class DLTSpider:
         self.session.headers.update(self.headers)
         
     def get_page_data(self):
-        """获取指定页面的数据"""
+        """使用selenium动态爬取大乐透数据"""
+        html_content_list = []
+        driver = None
+
         try:
-            print("尝试从网络获取数据...")
-            # 如果网络不可用，直接使用本地文件
-            with open("wangye.html", "r", encoding='utf-8') as f:
-                return [f.read()]
-        except FileNotFoundError:
-            print("本地HTML文件不存在")
+            # 配置浏览器选项
+            options = webdriver.ChromeOptions()
+            options.add_argument('--headless')  # 无头模式
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--disable-blink-features=AutomationControlled')
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option('useAutomationExtension', False)
+
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=options)
+
+            # 执行脚本隐藏webdriver特征
+            driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+
+            print("正在访问大乐透开奖页面...")
+            driver.get(self.base_url)
+            time.sleep(3)
+
+            # 等待页面加载完成
+            WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "annq"))
+            )
+
+            # 点击"近100期"按钮
+            print("点击近100期按钮...")
+            try:
+                recent_100_button = driver.find_element(By.CSS_SELECTOR, 'span.annq[data-z="100"]')
+                driver.execute_script("arguments[0].click();", recent_100_button)
+                time.sleep(3)
+
+                # 等待表格数据加载
+                WebDriverWait(driver, 15).until(
+                    EC.presence_of_element_located((By.TAG_NAME, "table"))
+                )
+                time.sleep(2)
+            except Exception as e:
+                print(f"点击近100期按钮失败: {e}")
+
+            # 获取第1页数据
+            print("获取第1页数据...")
+            html_content_list.append(driver.page_source)
+
+            # 获取其他页面数据（页码2、3、4）
+            for page_num in range(2, 5):  # 页码2、3、4
+                try:
+                    print(f"获取第{page_num}页数据...")
+
+                    # 查找并点击对应页码
+                    page_link = WebDriverWait(driver, 10).until(
+                        EC.element_to_be_clickable((By.CSS_SELECTOR, f'li a[title="{page_num}"]'))
+                    )
+                    driver.execute_script("arguments[0].click();", page_link)
+                    time.sleep(3)
+
+                    # 等待新页面数据加载
+                    WebDriverWait(driver, 15).until(
+                        EC.presence_of_element_located((By.TAG_NAME, "table"))
+                    )
+                    time.sleep(2)
+
+                    # 获取当前页面HTML
+                    html_content_list.append(driver.page_source)
+
+                except Exception as e:
+                    print(f"获取第{page_num}页数据失败: {e}")
+                    continue
+
+            driver.quit()
+            print(f"成功获取了{len(html_content_list)}页数据")
+            return html_content_list
+
+        except Exception as e:
+            print(f"获取页面数据时出错: {e}")
+            if driver is not None:
+                driver.quit()
             return None
 
     def parse_lottery_data(self, html_content_list):
@@ -820,7 +894,11 @@ def main():
                     analyzer.analyze_number_frequency(top_n=10)
                     predicted_front, predicted_back = analyzer.predict_lottery_numbers()
                     analyzer.analyze_weekday_patterns()
-                    analyzer.analyze_expert_data()
+
+                    # 创建专家分析器实例
+                    analyzer1 = ExpertAnalyzer()
+                    # 运行完整的专家数据分析流程
+                    result_df = analyzer1.run_expert_analysis()
 
                     if predicted_front and predicted_back:
                         front_str = [f"{num:02d}" for num in sorted(predicted_front)]
@@ -1003,37 +1081,84 @@ class ExpertAnalyzer:
         # 限制获取前30位专家
         experts_to_process = experts_list[:30]
 
-        for i, expert in enumerate(experts_to_process):
-            expert_id = expert.get('expertId')
-            expert_name = expert.get('name', f'专家{i+1}')
+        # 初始化浏览器（只开启一次）
+        driver = None
+        try:
+            print("正在初始化浏览器...")
+            options = webdriver.ChromeOptions()
+            # options.add_argument('--headless')  # 无头模式
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--disable-gpu')
 
-            print(f"\n处理第 {i+1}/30 位专家: {expert_name}")
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=options)
+            print("浏览器初始化完成")
 
-            # 获取基本信息
-            basic_data = {
-                'expert_id': expert_id,
-                'name': expert_name,
-                'lottery': expert.get('lottery', 0),
-                'follow': expert.get('follow', 0),
-                'grade_name': expert.get('gradeName', ''),
-                'rank': expert.get('rank', 0),
-                'norm': expert.get('norm', 0),
-                'best_record': expert.get('bestRecord', ''),
-                'good_record': expert.get('goodRecord', '')
-            }
+            for i, expert in enumerate(experts_to_process):
+                expert_id = expert.get('expertId')
+                expert_name = expert.get('name', f'专家{i+1}')
 
-            # 获取详细信息
-            detail_data = self.get_expert_detail(expert_id, expert_name)
-            if detail_data:
-                # 合并基本信息和详细信息
-                basic_data.update(detail_data)
+                print(f"\n处理第 {i+1}/30 位专家: {expert_name}")
 
-            all_expert_data.append(basic_data)
+                # 获取基本信息
+                basic_data = {
+                    'expert_id': expert_id,
+                    'name': expert_name,
+                    'lottery': expert.get('lottery', 0),
+                    'follow': expert.get('follow', 0),
+                    'grade_name': expert.get('gradeName', ''),
+                    'rank': expert.get('rank', 0),
+                    'norm': expert.get('norm', 0),
+                    'best_record': expert.get('bestRecord', ''),
+                    'good_record': expert.get('goodRecord', '')
+                }
 
-            # 添加延时避免请求过快
-            time.sleep(1)
+                # 获取详细信息（传入已创建的driver）
+                detail_data = self.get_expert_detail_with_driver(driver, expert_id, expert_name)
+                if detail_data:
+                    # 合并基本信息和详细信息
+                    basic_data.update(detail_data)
+
+                all_expert_data.append(basic_data)
+
+                # 添加延时避免请求过快
+                time.sleep(1)
+
+        except Exception as e:
+            print(f"爬取专家数据时出错: {e}")
+        finally:
+            # 确保浏览器被关闭
+            if driver:
+                print("正在关闭浏览器...")
+                driver.quit()
+                print("浏览器已关闭")
 
         return all_expert_data
+
+    def get_expert_detail_with_driver(self, driver, expert_id, expert_name):
+        """使用已有的浏览器实例获取专家详细信息"""
+        try:
+            url = self.expert_detail_url.format(expert_id)
+            print(f"  正在获取专家 {expert_name} (ID: {expert_id}) 的详细信息...")
+
+            # 使用已有的driver访问页面
+            driver.get(url)
+            time.sleep(2)
+
+            # 等待页面加载
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "okami-text"))
+            )
+
+            # 获取页面HTML
+            html = driver.page_source
+
+            return self.parse_expert_detail(html, expert_name)
+
+        except Exception as e:
+            print(f"  获取专家 {expert_name} 详细信息失败: {e}")
+            return None
 
     def save_to_csv(self, expert_data, filename='expert_analysis_result.csv'):
         """保存数据到CSV文件"""
@@ -1197,29 +1322,46 @@ class ExpertAnalyzer:
         expert_csv_file = 'expert_analysis_result.csv'
         expert_data = None
         df = None
+
         # 尝试从CSV文件读取专家数据
         print("正在检查本地专家数据文件...")
-        df = pd.read_csv(expert_csv_file, encoding='utf-8-sig')
+        try:
+            df = pd.read_csv(expert_csv_file, encoding='utf-8-sig')
+            if not df.empty and len(df) > 0:
+                print(f"✅ 从本地文件 `{expert_csv_file}` 成功读取到 {len(df)} 位专家的数据")
+                self.analyze_and_visualize(df)
+            else:
+                print("本地专家数据文件为空，需要重新获取数据")
+                df = None
+        except FileNotFoundError:
+            print("本地专家数据文件不存在，需要获取新数据")
+            df = None
+        except Exception as e:
+            print(f"读取本地专家数据文件时出错: {e}")
+            df = None
 
-        if not df.empty and len(df) > 0:
-            print(f"✅ 从本地文件 `{expert_csv_file}` 成功读取到 {len(df)} 位专家的数据")
-            self.analyze_and_visualize(df)
-        else:
+        # 如果没有本地数据，则执行数据爬取流程
+        if df is None:
             # 1. 爬取专家数据
             expert_data = self.crawl_experts_data()
             if not expert_data:
-                print("数据爬取失败，程序结束")
-                return
+                print("数据爬取失败")
+                # 创建一些模拟数据用于演示
+                # expert_data = self.create_mock_expert_data()
+                exit(1)
+
             # 2. 保存到CSV
             df = self.save_to_csv(expert_data)
             if df is None:
                 print("数据保存失败，程序结束")
-                return
+                return None
+
             # 3. 数据分析和可视化
             self.analyze_and_visualize(df)
 
         print("\n=== 专家数据分析完成 ===")
         return df
+
 
 if __name__ == "__main__":
     main()
